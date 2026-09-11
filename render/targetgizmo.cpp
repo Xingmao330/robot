@@ -36,6 +36,16 @@ float rayAxisDistance(const QVector3D &rayOrigin, const QVector3D &rayDirection,
     const float rayDistance = directionAxis * *axisDistance - rayOffset;
     return (rayOrigin + rayDirection * rayDistance - (axisOrigin + axis * *axisDistance)).length();
 }
+
+bool rayPlaneIntersection(const QVector3D &rayOrigin, const QVector3D &rayDirection, const QVector3D &planePoint,
+                          const QVector3D &planeNormal, QVector3D *intersection)
+{
+    const float denominator = QVector3D::dotProduct(rayDirection, planeNormal);
+    if (std::abs(denominator) < 1.0e-5f) return false;
+    const float distance = QVector3D::dotProduct(planePoint - rayOrigin, planeNormal) / denominator;
+    *intersection = rayOrigin + rayDirection * distance;
+    return true;
+}
 } // namespace
 
 void TargetGizmo::setPosition(const QVector3D &position) { m_position = position; m_visible = true; }
@@ -56,6 +66,18 @@ bool TargetGizmo::beginDrag(const QPoint &screenPosition, const QSize &viewport,
 {
     if (!m_visible) return false;
     const float length = axisLength(cameraPosition); const QPointF cursor = screenPosition;
+    const QPointF center = projectPoint(m_position, viewport, projection, view);
+    // 白色中心点优先于三根轴；它代表平行于当前屏幕的自由移动平面。
+    if (QLineF(center, cursor).length() <= 11.0f) {
+        QVector3D rayOrigin, rayDirection;
+        if (!rayFromScreen(screenPosition, viewport, projection, view, &rayOrigin, &rayDirection)) return false;
+        m_dragPlaneNormal = (cameraPosition - m_position).normalized();
+        if (m_dragPlaneNormal.isNull() || !rayPlaneIntersection(rayOrigin, rayDirection, m_position, m_dragPlaneNormal, &m_dragStartPlanePoint)) return false;
+        m_activeAxis = Axis::ViewPlane;
+        m_dragStartPosition = m_position;
+        m_dragging = true;
+        return true;
+    }
     Axis closestAxis = Axis::None; float closestDistance = 12.0f;
     for (const Axis axis : {Axis::X, Axis::Y, Axis::Z}) {
         const float distance = pointToSegmentDistance(cursor, projectPoint(m_position, viewport, projection, view), projectPoint(m_position + axisVector(axis) * length, viewport, projection, view));
@@ -74,6 +96,12 @@ bool TargetGizmo::drag(const QPoint &screenPosition, const QSize &viewport, cons
     if (!m_dragging) return false;
     QVector3D rayOrigin, rayDirection;
     if (!rayFromScreen(screenPosition, viewport, projection, view, &rayOrigin, &rayDirection)) return false;
+    if (m_activeAxis == Axis::ViewPlane) {
+        QVector3D currentPlanePoint;
+        if (!rayPlaneIntersection(rayOrigin, rayDirection, m_dragStartPosition, m_dragPlaneNormal, &currentPlanePoint)) return false;
+        m_position = m_dragStartPosition + currentPlanePoint - m_dragStartPlanePoint;
+        return true;
+    }
     float currentAxisDistance = 0.0f;
     if (!std::isfinite(rayAxisDistance(rayOrigin, rayDirection, m_dragStartPosition, axisVector(m_activeAxis), &currentAxisDistance))) return false;
     m_position = m_dragStartPosition + axisVector(m_activeAxis) * (currentAxisDistance - m_dragStartAxisDistance);

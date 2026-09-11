@@ -22,7 +22,7 @@ public:
     void endDrag();
 
 private:
-    enum class Axis { None, X, Y, Z };
+    enum class Axis { None, X, Y, Z, ViewPlane };
     bool rayFromScreen(const QPoint &screenPosition, const QSize &viewport, const QMatrix4x4 &projection,
                        const QMatrix4x4 &view, QVector3D *origin, QVector3D *direction) const;
     [[nodiscard]] QVector3D axisVector(Axis axis) const;
@@ -32,6 +32,8 @@ private:
     QVector3D m_axisY {0.0f, 1.0f, 0.0f};
     QVector3D m_axisZ {0.0f, 0.0f, 1.0f};
     QVector3D m_dragStartPosition;
+    QVector3D m_dragStartPlanePoint;
+    QVector3D m_dragPlaneNormal;
     float m_dragStartAxisDistance = 0.0f;
     Axis m_activeAxis = Axis::None;
     bool m_visible = false;

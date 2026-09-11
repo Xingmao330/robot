@@ -412,6 +412,8 @@ void RobotOpenGLWidget::drawTargetGizmo()
     addLine(center + yAxis * length, center + yAxis * (length - cap) - xAxis * cap, {0.15f, 0.95f, 0.20f});
     addLine(center + zAxis * length, center + zAxis * (length - cap) + xAxis * cap, {0.20f, 0.45f, 1.0f});
     addLine(center + zAxis * length, center + zAxis * (length - cap) - xAxis * cap, {0.20f, 0.45f, 1.0f});
+    // 白色中心点是自由平面拖动区；单独以 GL_POINTS 绘制以保持固定的屏幕尺寸。
+    vertices.push_back({center.x(), center.y(), center.z(), 1.0f, 1.0f, 1.0f});
     m_program.setUniformValue("model", QMatrix4x4());
     m_program.setUniformValue("useLighting", false);
     m_program.setUniformValue("selected", false);
@@ -420,7 +422,10 @@ void RobotOpenGLWidget::drawTargetGizmo()
     m_gizmoBuffer.bind();
     m_gizmoBuffer.allocate(vertices.data(), int(vertices.size() * sizeof(Vertex)));
     m_gizmoBuffer.release();
-    glDrawArrays(GL_LINES, 0, int(vertices.size()));
+    glDrawArrays(GL_LINES, 0, int(vertices.size() - 1));
+    glPointSize(12.0f);
+    glDrawArrays(GL_POINTS, int(vertices.size() - 1), 1);
+    glPointSize(1.0f);
     m_gizmoVao.release();
     glEnable(GL_DEPTH_TEST);
 }
