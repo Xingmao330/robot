@@ -1,0 +1,16 @@
+# Qt Creator local state and generated build outputs
+.qtcreator/
+.idea/
+build/
+build-*/
+
+# CMake and compiler by-products
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.user
+*.obj
+*.pdb
+*.ilk
+*.exe
