@@ -7,9 +7,12 @@
 #include <QFile>
 #include <QFormLayout>
 #include <QLabel>
+#include <QListWidget>
 #include <QPushButton>
+#include <QSignalBlocker>
 #include <QSlider>
 #include <QStatusBar>
+#include <QStringList>
 #include <QToolBar>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -38,10 +41,22 @@ MainWindow::MainWindow(QWidget *parent)
         m_robotModel.setJointAngle(index, degrees);
         updateRobotView();
     });
+    connect(&m_trajectoryPlayer, &TrajectoryPlayer::jointAnglesChanged, this, [this](const QVector<float> &angles) {
+        for (int index = 0; index < angles.size(); ++index) {
+            m_robotModel.setJointAngle(index, angles[index]);
+            if (index < m_jointSliders.size()) {
+                const QSignalBlocker blocker(m_jointSliders[index]);
+                m_jointSliders[index]->setValue(qRound(angles[index]));
+            }
+        }
+        updateRobotView();
+    });
     connect(m_robotView, &RobotOpenGLWidget::ikTargetMoved, this, [this](const QVector3D &targetPosition) {
+        m_trajectoryPlayer.stop();
         const IKSolver::Result result = m_ikSolver.solvePosition(m_robotModel, targetPosition);
         for (int index = 0; index < result.jointAngles.size(); ++index)
-            m_jointAnimator.animateTo(index, result.jointAngles[index]);
+            m_robotModel.setJointAngle(index, result.jointAngles[index]);
+        updateRobotView();
     });
 
     auto *jointDock = new QDockWidget(tr("关节控制"), this);
@@ -57,11 +72,14 @@ MainWindow::MainWindow(QWidget *parent)
         slider->setValue(0);
         slider->setTickPosition(QSlider::TicksBelow);
         slider->setTickInterval(45);
+        m_jointSliders.append(slider);
         auto *row = new QFormLayout;
         row->addRow(tr("J%1").arg(index + 1), slider);
         layout->addLayout(row);
         connect(slider, &QSlider::valueChanged, this, [this, index](int degrees) {
-            m_jointAnimator.animateTo(index, float(degrees));
+            m_trajectoryPlayer.stop();
+            m_robotModel.setJointAngle(index, float(degrees));
+            updateRobotView();
         });
     }
 
@@ -71,20 +89,49 @@ MainWindow::MainWindow(QWidget *parent)
             slider->setValue(0);
     });
     layout->addWidget(zeroButton);
-    auto *ikButton = new QPushButton(tr("IK 测试：TCP 前移"), controlWidget);
-    ikButton->setToolTip(tr("以当前 link6 TCP 为起点，求解向 X 方向前移 100 mm 的关节目标"));
-    connect(ikButton, &QPushButton::clicked, this, [this] {
-        const KinematicState currentState = m_robotModel.kinematicState();
-        if (!currentState.valid) { statusBar()->showMessage(tr("IK 不可用：未找到 link6 TCP")); return; }
-        const QVector3D targetPosition = currentState.endEffectorPosition + QVector3D(0.10f, 0.0f, 0.0f);
-        m_robotView->setIkTargetPosition(targetPosition);
-        const IKSolver::Result result = m_ikSolver.solvePosition(m_robotModel, targetPosition);
-        for (int index = 0; index < result.jointAngles.size(); ++index)
-            m_jointAnimator.animateTo(index, result.jointAngles[index]);
-        statusBar()->showMessage(result.reached ? tr("IK 已收敛，位置误差 %1 mm").arg(result.positionError * 1000.0f, 0, 'f', 1)
-                                                : tr("IK 未完全收敛，当前误差 %1 mm").arg(result.positionError * 1000.0f, 0, 'f', 1));
+
+    layout->addWidget(new QLabel(tr("轨迹记录"), controlWidget));
+    auto *waypointList = new QListWidget(controlWidget);
+    waypointList->setToolTip(tr("按记录时保存当前六轴角度；播放按记录顺序经过各点"));
+    layout->addWidget(waypointList);
+    auto *recordButton = new QPushButton(tr("记录当前位置"), controlWidget);
+    connect(recordButton, &QPushButton::clicked, this, [this, waypointList] {
+        const QVector<float> angles = m_robotModel.jointAngles();
+        m_trajectoryPlayer.addWaypoint(angles);
+        QStringList values;
+        for (int index = 0; index < angles.size(); ++index)
+            values.append(tr("J%1=%2°").arg(index + 1).arg(angles[index], 0, 'f', 0));
+        waypointList->addItem(tr("点 %1：%2").arg(m_trajectoryPlayer.waypointCount()).arg(values.join(QStringLiteral("  "))));
+        statusBar()->showMessage(tr("已记录轨迹点 %1").arg(m_trajectoryPlayer.waypointCount()));
     });
-    layout->addWidget(ikButton);
+    layout->addWidget(recordButton);
+    auto *startButton = new QPushButton(tr("开始播放"), controlWidget);
+    connect(startButton, &QPushButton::clicked, this, [this] {
+        if (m_trajectoryPlayer.waypointCount() < 2) {
+            statusBar()->showMessage(tr("请至少记录两个轨迹点"));
+            return;
+        }
+        if (m_trajectoryPlayer.isPlaying() && !m_trajectoryPlayer.isPaused()) {
+            m_trajectoryPlayer.pause();
+            statusBar()->showMessage(tr("轨迹播放已暂停"));
+            return;
+        }
+        m_trajectoryPlayer.start();
+        statusBar()->showMessage(tr("正在循环播放 %1 个轨迹点").arg(m_trajectoryPlayer.waypointCount()));
+    });
+    connect(&m_trajectoryPlayer, &TrajectoryPlayer::playbackStateChanged, startButton,
+            [startButton](bool playing, bool paused) {
+        startButton->setText(playing && !paused ? QObject::tr("暂停") : QObject::tr("开始播放"));
+    });
+    layout->addWidget(startButton);
+    auto *clearButton = new QPushButton(tr("清除记录"), controlWidget);
+    connect(clearButton, &QPushButton::clicked, this, [this, waypointList] {
+        m_trajectoryPlayer.clear();
+        waypointList->clear();
+        statusBar()->showMessage(tr("轨迹记录已清除"));
+    });
+    layout->addWidget(clearButton);
+
     layout->addStretch();
     jointDock->setWidget(controlWidget);
     addDockWidget(Qt::LeftDockWidgetArea, jointDock);

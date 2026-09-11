@@ -81,6 +81,8 @@ private:
     QVector<QMatrix4x4> m_glbNodeTransforms;
     int m_selectedNodeIndex = -1;
     TargetGizmo m_targetGizmo;
+    bool m_gizmoFollowsSelectedNode = false;
+    QVector3D m_gizmoLocalOffset;
 };
 
 #endif // ROBOTOPENGLWIDGET_H

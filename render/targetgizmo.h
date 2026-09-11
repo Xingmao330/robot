@@ -10,7 +10,9 @@ class TargetGizmo
 {
 public:
     void setPosition(const QVector3D &position);
+    void setAxesFromTransform(const QMatrix4x4 &transform);
     [[nodiscard]] const QVector3D &position() const;
+    [[nodiscard]] QVector3D axisDirection(int axisIndex) const;
     [[nodiscard]] bool isVisible() const;
     [[nodiscard]] float axisLength(const QVector3D &cameraPosition) const;
     bool beginDrag(const QPoint &screenPosition, const QSize &viewport, const QMatrix4x4 &projection,
@@ -23,9 +25,12 @@ private:
     enum class Axis { None, X, Y, Z };
     bool rayFromScreen(const QPoint &screenPosition, const QSize &viewport, const QMatrix4x4 &projection,
                        const QMatrix4x4 &view, QVector3D *origin, QVector3D *direction) const;
-    static QVector3D axisVector(Axis axis);
+    [[nodiscard]] QVector3D axisVector(Axis axis) const;
 
     QVector3D m_position;
+    QVector3D m_axisX {1.0f, 0.0f, 0.0f};
+    QVector3D m_axisY {0.0f, 1.0f, 0.0f};
+    QVector3D m_axisZ {0.0f, 0.0f, 1.0f};
     QVector3D m_dragStartPosition;
     float m_dragStartAxisDistance = 0.0f;
     Axis m_activeAxis = Axis::None;

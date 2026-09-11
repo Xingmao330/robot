@@ -196,11 +196,17 @@ void RobotOpenGLWidget::setGlbModel(const GlbModel &model)
 void RobotOpenGLWidget::setGlbNodeTransforms(const QVector<QMatrix4x4> &nodeTransforms)
 {
     m_glbNodeTransforms = nodeTransforms;
+    if (m_selectedNodeIndex >= 0 && m_selectedNodeIndex < m_glbNodeTransforms.size()) {
+        m_targetGizmo.setAxesFromTransform(m_glbNodeTransforms[m_selectedNodeIndex]);
+        if (m_gizmoFollowsSelectedNode)
+            m_targetGizmo.setPosition(m_glbNodeTransforms[m_selectedNodeIndex].map(m_gizmoLocalOffset));
+    }
     update();
 }
 
 void RobotOpenGLWidget::setIkTargetPosition(const QVector3D &position)
 {
+    m_gizmoFollowsSelectedNode = false;
     m_targetGizmo.setPosition(position);
     update();
 }
@@ -257,6 +263,12 @@ void RobotOpenGLWidget::mouseMoveEvent(QMouseEvent *event)
     if (event->buttons().testFlag(Qt::LeftButton)) {
         if (m_draggingIkTarget) {
             if (m_targetGizmo.drag(event->pos(), size(), m_projection, m_camera.viewMatrix())) {
+                if (m_gizmoFollowsSelectedNode && m_selectedNodeIndex >= 0 && m_selectedNodeIndex < m_glbNodeTransforms.size()) {
+                    bool invertible = false;
+                    const QMatrix4x4 inverseNodeTransform = m_glbNodeTransforms[m_selectedNodeIndex].inverted(&invertible);
+                    if (invertible)
+                        m_gizmoLocalOffset = inverseNodeTransform.map(m_targetGizmo.position());
+                }
                 emit ikTargetMoved(m_targetGizmo.position());
                 update();
             }
@@ -284,8 +296,12 @@ void RobotOpenGLWidget::mouseReleaseEvent(QMouseEvent *event)
     if (event->button() == Qt::LeftButton && !m_leftDragActive && m_glbModel) {
         const int pickedNode = ScenePicker::pickNode(event->pos(), size(), m_projection, m_camera.viewMatrix(), *m_glbModel, m_glbNodeTransforms);
         m_selectedNodeIndex = pickedNode;
-        if (pickedNode >= 0)
+        if (pickedNode >= 0) {
             m_targetGizmo.setPosition(m_glbNodeTransforms[pickedNode].map({0.0f, 0.0f, 0.0f}));
+            m_targetGizmo.setAxesFromTransform(m_glbNodeTransforms[pickedNode]);
+            m_gizmoFollowsSelectedNode = true;
+            m_gizmoLocalOffset = {};
+        }
         emit componentSelected(pickedNode >= 0 ? m_glbModel->nodes()[pickedNode].name : QString(), pickedNode);
         update();
     }
@@ -385,16 +401,17 @@ void RobotOpenGLWidget::drawTargetGizmo()
         vertices.push_back({start.x(), start.y(), start.z(), color.x(), color.y(), color.z()});
         vertices.push_back({end.x(), end.y(), end.z(), color.x(), color.y(), color.z()});
     };
-    addLine(center, center + QVector3D(length, 0.0f, 0.0f), {0.95f, 0.15f, 0.15f});
-    addLine(center, center + QVector3D(0.0f, length, 0.0f), {0.15f, 0.95f, 0.20f});
-    addLine(center, center + QVector3D(0.0f, 0.0f, length), {0.20f, 0.45f, 1.0f});
+    const QVector3D xAxis = m_targetGizmo.axisDirection(0), yAxis = m_targetGizmo.axisDirection(1), zAxis = m_targetGizmo.axisDirection(2);
+    addLine(center, center + xAxis * length, {0.95f, 0.15f, 0.15f});
+    addLine(center, center + yAxis * length, {0.15f, 0.95f, 0.20f});
+    addLine(center, center + zAxis * length, {0.20f, 0.45f, 1.0f});
     const float cap = length * 0.10f;
-    addLine(center + QVector3D(length, 0, 0), center + QVector3D(length - cap, cap, 0), {0.95f, 0.15f, 0.15f});
-    addLine(center + QVector3D(length, 0, 0), center + QVector3D(length - cap, -cap, 0), {0.95f, 0.15f, 0.15f});
-    addLine(center + QVector3D(0, length, 0), center + QVector3D(cap, length - cap, 0), {0.15f, 0.95f, 0.20f});
-    addLine(center + QVector3D(0, length, 0), center + QVector3D(-cap, length - cap, 0), {0.15f, 0.95f, 0.20f});
-    addLine(center + QVector3D(0, 0, length), center + QVector3D(cap, 0, length - cap), {0.20f, 0.45f, 1.0f});
-    addLine(center + QVector3D(0, 0, length), center + QVector3D(-cap, 0, length - cap), {0.20f, 0.45f, 1.0f});
+    addLine(center + xAxis * length, center + xAxis * (length - cap) + yAxis * cap, {0.95f, 0.15f, 0.15f});
+    addLine(center + xAxis * length, center + xAxis * (length - cap) - yAxis * cap, {0.95f, 0.15f, 0.15f});
+    addLine(center + yAxis * length, center + yAxis * (length - cap) + xAxis * cap, {0.15f, 0.95f, 0.20f});
+    addLine(center + yAxis * length, center + yAxis * (length - cap) - xAxis * cap, {0.15f, 0.95f, 0.20f});
+    addLine(center + zAxis * length, center + zAxis * (length - cap) + xAxis * cap, {0.20f, 0.45f, 1.0f});
+    addLine(center + zAxis * length, center + zAxis * (length - cap) - xAxis * cap, {0.20f, 0.45f, 1.0f});
     m_program.setUniformValue("model", QMatrix4x4());
     m_program.setUniformValue("useLighting", false);
     m_program.setUniformValue("selected", false);

@@ -32,6 +32,8 @@ qt_add_executable(robot
     robot/iksolver.cpp
     robot/iksolver.h
     robot/kinematicstate.h
+    robot/trajectoryplayer.cpp
+    robot/trajectoryplayer.h
     robot/link.cpp
     robot/link.h
     robot/robotmodel.cpp

@@ -39,7 +39,15 @@ float rayAxisDistance(const QVector3D &rayOrigin, const QVector3D &rayDirection,
 } // namespace
 
 void TargetGizmo::setPosition(const QVector3D &position) { m_position = position; m_visible = true; }
+void TargetGizmo::setAxesFromTransform(const QMatrix4x4 &transform)
+{
+    const QVector3D x = transform.mapVector({1.0f, 0.0f, 0.0f}).normalized();
+    const QVector3D y = transform.mapVector({0.0f, 1.0f, 0.0f}).normalized();
+    const QVector3D z = transform.mapVector({0.0f, 0.0f, 1.0f}).normalized();
+    if (!x.isNull() && !y.isNull() && !z.isNull()) { m_axisX = x; m_axisY = y; m_axisZ = z; }
+}
 const QVector3D &TargetGizmo::position() const { return m_position; }
+QVector3D TargetGizmo::axisDirection(int axisIndex) const { return axisIndex == 0 ? m_axisX : axisIndex == 1 ? m_axisY : m_axisZ; }
 bool TargetGizmo::isVisible() const { return m_visible; }
 float TargetGizmo::axisLength(const QVector3D &cameraPosition) const { return std::clamp((cameraPosition - m_position).length() * 0.12f, 0.10f, 0.55f); }
 
@@ -86,9 +94,9 @@ bool TargetGizmo::rayFromScreen(const QPoint &screenPosition, const QSize &viewp
     return true;
 }
 
-QVector3D TargetGizmo::axisVector(Axis axis)
+QVector3D TargetGizmo::axisVector(Axis axis) const
 {
-    if (axis == Axis::X) return {1.0f, 0.0f, 0.0f};
-    if (axis == Axis::Y) return {0.0f, 1.0f, 0.0f};
-    return {0.0f, 0.0f, 1.0f};
+    if (axis == Axis::X) return m_axisX;
+    if (axis == Axis::Y) return m_axisY;
+    return m_axisZ;
 }
