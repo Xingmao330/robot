@@ -140,10 +140,11 @@ MainWindow::MainWindow(QWidget *parent)
     QAction *resetViewAction = toolbar->addAction(tr("重置视角"));
     connect(resetViewAction, &QAction::triggered, m_robotView, &RobotOpenGLWidget::resetCamera);
     if (!modelLoaded) {
-        statusBar()->showMessage(tr("模型加载失败：%1；正在显示原型机械臂").arg(modelError));
+        statusBar()->showMessage(tr("模型加载失败：%1").arg(modelError));
+    } else {
+        statusBar()->showMessage(tr("左键平移  |  中键绕目标旋转  |  滚轮缩放"));
     }
     updateRobotView();
-    statusBar()->showMessage(tr("左键平移  |  中键绕目标旋转  |  滚轮缩放"));
 }
 
 MainWindow::~MainWindow() = default;
@@ -152,6 +153,4 @@ void MainWindow::updateRobotView()
 {
     if (m_robotModel.hasGlbModel())
         m_robotView->setGlbNodeTransforms(m_robotModel.glbNodeTransforms());
-    else
-        m_robotView->setLinkTransforms(m_forwardKinematics.solve(m_robotModel));
 }

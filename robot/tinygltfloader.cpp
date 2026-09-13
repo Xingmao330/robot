@@ -40,13 +40,13 @@ bool TinyGltfLoader::load(const QString &fileName, GlbModel *model, QString *err
     tinygltf3::Model source;
     tinygltf3::ErrorStack errors;
     if (tg3_parse_glb(source.get(), errors.get(), reinterpret_cast<const uint8_t *>(data.constData()),
-                      uint64_t(data.size()), baseDir.constData(), uint32_t(baseDir.size()), nullptr) != TG3_OK) {
+                      static_cast<uint64_t>(data.size()), baseDir.constData(), static_cast<uint32_t>(baseDir.size()), nullptr) != TG3_OK) {
         *errorMessage = parserErrors(errors);
         return false;
     }
     const tg3_model *src = source.get();
     GlbModel loaded;
-    QVector<QVector<int> > meshPrimitives(int(src->meshes_count));
+    QVector<QVector<int> > meshPrimitives(static_cast<int>(src->meshes_count));
     for (uint32_t meshId = 0; meshId < src->meshes_count; ++meshId) {
         const tg3_mesh &srcMesh = src->meshes[meshId];
         for (uint32_t primitiveId = 0; primitiveId < srcMesh.primitives_count; ++primitiveId) {
@@ -78,8 +78,13 @@ bool TinyGltfLoader::load(const QString &fileName, GlbModel *model, QString *err
             GlbMesh mesh;
             mesh.vertices.reserve(int(positions.count) * 6);
             mesh.indices.reserve(int(indices.count));
-            mesh.minimum = {std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
-            mesh.maximum = {-std::numeric_limits<float>::max(), -std::numeric_limits<float>::max(), -std::numeric_limits<float>::max()};
+            mesh.minimum = {
+                std::numeric_limits<float>::max(), std::numeric_limits<float>::max(), std::numeric_limits<float>::max()
+            };
+            mesh.maximum = {
+                -std::numeric_limits<float>::max(), -std::numeric_limits<float>::max(),
+                -std::numeric_limits<float>::max()
+            };
             if (primitive.material >= 0 && primitive.material < int(src->materials_count)) {
                 const auto &material = src->materials[primitive.material].pbr_metallic_roughness;
                 mesh.baseColor = {
@@ -93,8 +98,12 @@ bool TinyGltfLoader::load(const QString &fileName, GlbModel *model, QString *err
                 const float *p = reinterpret_cast<const float *>(positionData + i * uint64_t(positionStride));
                 const float *n = reinterpret_cast<const float *>(normalData + i * uint64_t(normalStride));
                 mesh.vertices << p[0] << p[1] << p[2] << n[0] << n[1] << n[2];
-                mesh.minimum.setX(std::min(mesh.minimum.x(), p[0])); mesh.minimum.setY(std::min(mesh.minimum.y(), p[1])); mesh.minimum.setZ(std::min(mesh.minimum.z(), p[2]));
-                mesh.maximum.setX(std::max(mesh.maximum.x(), p[0])); mesh.maximum.setY(std::max(mesh.maximum.y(), p[1])); mesh.maximum.setZ(std::max(mesh.maximum.z(), p[2]));
+                mesh.minimum.setX(std::min(mesh.minimum.x(), p[0]));
+                mesh.minimum.setY(std::min(mesh.minimum.y(), p[1]));
+                mesh.minimum.setZ(std::min(mesh.minimum.z(), p[2]));
+                mesh.maximum.setX(std::max(mesh.maximum.x(), p[0]));
+                mesh.maximum.setY(std::max(mesh.maximum.y(), p[1]));
+                mesh.maximum.setZ(std::max(mesh.maximum.z(), p[2]));
             }
             for (uint64_t i = 0; i < indices.count; ++i) {
                 const unsigned char *v = indexData + i * uint64_t(indexStride);

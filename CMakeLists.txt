@@ -18,8 +18,6 @@ qt_add_executable(robot
     render/scenepicker.h
     render/targetgizmo.cpp
     render/targetgizmo.h
-    robot/forwardkinematics.cpp
-    robot/forwardkinematics.h
     robot/glbmodel.cpp
     robot/glbmodel.h
     robot/tinygltfloader.cpp
@@ -34,8 +32,6 @@ qt_add_executable(robot
     robot/kinematicstate.h
     robot/trajectoryplayer.cpp
     robot/trajectoryplayer.h
-    robot/link.cpp
-    robot/link.h
     robot/robotmodel.cpp
     robot/robotmodel.h
 )

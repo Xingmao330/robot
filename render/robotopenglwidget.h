@@ -30,7 +30,6 @@ public:
     explicit RobotOpenGLWidget(QWidget *parent = nullptr);
     ~RobotOpenGLWidget() override;
 
-    void setLinkTransforms(const QVector<QMatrix4x4> &linkTransforms);
     void setGlbModel(const GlbModel &model);
     void setGlbNodeTransforms(const QVector<QMatrix4x4> &nodeTransforms);
     void setIkTargetPosition(const QVector3D &position);
@@ -56,15 +55,11 @@ private:
     void uploadGlbModel();
     void clearGlbResources();
     void drawGeometry(QOpenGLVertexArrayObject &vao, int count, unsigned int primitive);
-    void drawCube(const QMatrix4x4 &model, const QMatrix4x4 &view);
 
     QOpenGLShaderProgram m_program;
     QOpenGLVertexArrayObject m_lineVao;
     QOpenGLBuffer m_lineBuffer {QOpenGLBuffer::VertexBuffer};
     int m_lineVertexCount = 0;
-    QOpenGLVertexArrayObject m_cubeVao;
-    QOpenGLBuffer m_cubeBuffer {QOpenGLBuffer::VertexBuffer};
-    int m_cubeVertexCount = 0;
     QOpenGLVertexArrayObject m_gizmoVao;
     QOpenGLBuffer m_gizmoBuffer {QOpenGLBuffer::VertexBuffer};
     QMatrix4x4 m_projection;
@@ -74,7 +69,6 @@ private:
     bool m_leftDragActive = false;
     bool m_draggingIkTarget = false;
     OrbitCamera m_camera;
-    QVector<QMatrix4x4> m_linkTransforms;
     struct GpuMesh;
     std::vector<std::unique_ptr<GpuMesh>> m_glbMeshes;
     const GlbModel *m_glbModel = nullptr;

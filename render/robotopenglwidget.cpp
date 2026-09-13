@@ -8,13 +8,11 @@
 #include <QWheelEvent>
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <vector>
 
 namespace {
-
-constexpr char vertexShaderSource[] = R"(
+    constexpr char vertexShaderSource[] = R"(
 #version 330 core
 layout (location = 0) in vec3 position;
 layout (location = 1) in vec3 aNormalOrColor;
@@ -32,7 +30,7 @@ void main()
 }
 )";
 
-constexpr char fragmentShaderSource[] = R"(
+    constexpr char fragmentShaderSource[] = R"(
 #version 330 core
 in vec3 vNormalOrColor;
 in vec3 worldPosition;
@@ -72,38 +70,31 @@ void main()
 }
 )";
 
-struct Vertex {
-    float x;
-    float y;
-    float z;
-    float r;
-    float g;
-    float b;
-};
-
+    struct Vertex {
+        float x;
+        float y;
+        float z;
+        float r;
+        float g;
+        float b;
+    };
 } // namespace
 
 struct RobotOpenGLWidget::GpuMesh {
     QOpenGLVertexArrayObject vao;
-    QOpenGLBuffer vertices {QOpenGLBuffer::VertexBuffer};
-    QOpenGLBuffer indices {QOpenGLBuffer::IndexBuffer};
+    QOpenGLBuffer vertices{QOpenGLBuffer::VertexBuffer};
+    QOpenGLBuffer indices{QOpenGLBuffer::IndexBuffer};
     int indexCount = 0;
 };
 
 RobotOpenGLWidget::RobotOpenGLWidget(QWidget *parent)
-    : QOpenGLWidget(parent)
-{
-    setFocusPolicy(Qt::StrongFocus);
-    setMouseTracking(true);
+    : QOpenGLWidget(parent) {
 }
 
-RobotOpenGLWidget::~RobotOpenGLWidget()
-{
+RobotOpenGLWidget::~RobotOpenGLWidget() {
     makeCurrent();
     m_lineBuffer.destroy();
     m_lineVao.destroy();
-    m_cubeBuffer.destroy();
-    m_cubeVao.destroy();
     m_gizmoBuffer.destroy();
     m_gizmoVao.destroy();
     clearGlbResources();
@@ -111,8 +102,7 @@ RobotOpenGLWidget::~RobotOpenGLWidget()
     doneCurrent();
 }
 
-void RobotOpenGLWidget::initializeGL()
-{
+void RobotOpenGLWidget::initializeGL() {
     initializeOpenGLFunctions();
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_MULTISAMPLE);
@@ -130,15 +120,13 @@ void RobotOpenGLWidget::initializeGL()
         uploadGlbModel();
 }
 
-void RobotOpenGLWidget::resizeGL(int width, int height)
-{
-    const int safeHeight = std::max(height, 1);
+void RobotOpenGLWidget::resizeGL(int width, int height) {
+    const int safeHeight = std::max(height, 1); //防止除以0
     m_projection.setToIdentity();
     m_projection.perspective(45.0f, float(width) / float(safeHeight), 0.05f, 200.0f);
 }
 
-void RobotOpenGLWidget::paintGL()
-{
+void RobotOpenGLWidget::paintGL() {
     glClearColor(0.17f, 0.17f, 0.18f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     if (!m_program.isLinked())
@@ -154,13 +142,10 @@ void RobotOpenGLWidget::paintGL()
     m_program.setUniformValue("selected", false);
     drawGeometry(m_lineVao, m_lineVertexCount, GL_LINES);
 
-    if (m_glbMeshes.empty()) {
-        for (const QMatrix4x4 &linkTransform : m_linkTransforms)
-            drawCube(linkTransform, view);
-    } else {
+    if (!m_glbMeshes.empty()) {
         const QVector<GlbNode> &nodes = m_glbModel->nodes();
         for (int nodeIndex = 0; nodeIndex < nodes.size() && nodeIndex < m_glbNodeTransforms.size(); ++nodeIndex) {
-            for (const int meshIndex : nodes[nodeIndex].meshIndices) {
+            for (const int meshIndex: nodes[nodeIndex].meshIndices) {
                 if (meshIndex < 0 || meshIndex >= int(m_glbMeshes.size())) continue;
                 const GlbMesh &sourceMesh = m_glbModel->meshes()[meshIndex];
                 m_program.setUniformValue("model", m_glbNodeTransforms[nodeIndex]);
@@ -169,8 +154,10 @@ void RobotOpenGLWidget::paintGL()
                 m_program.setUniformValue("metallic", sourceMesh.metallic);
                 m_program.setUniformValue("roughness", sourceMesh.roughness);
                 m_program.setUniformValue("selected", nodeIndex == m_selectedNodeIndex);
-                GpuMesh &mesh = *m_glbMeshes[size_t(meshIndex)]; mesh.vao.bind();
-                glDrawElements(GL_TRIANGLES, mesh.indexCount, GL_UNSIGNED_INT, nullptr); mesh.vao.release();
+                GpuMesh &mesh = *m_glbMeshes[size_t(meshIndex)];
+                mesh.vao.bind();
+                glDrawElements(GL_TRIANGLES, mesh.indexCount, GL_UNSIGNED_INT, nullptr);
+                mesh.vao.release();
             }
         }
     }
@@ -180,21 +167,17 @@ void RobotOpenGLWidget::paintGL()
     m_program.release();
 }
 
-void RobotOpenGLWidget::setLinkTransforms(const QVector<QMatrix4x4> &linkTransforms)
-{
-    m_linkTransforms = linkTransforms;
-    update();
-}
-
-void RobotOpenGLWidget::setGlbModel(const GlbModel &model)
-{
+void RobotOpenGLWidget::setGlbModel(const GlbModel &model) {
     m_glbModel = &model;
-    if (context()) { makeCurrent(); uploadGlbModel(); doneCurrent(); }
+    if (context()) {
+        makeCurrent();
+        uploadGlbModel();
+        doneCurrent();
+    }
     update();
 }
 
-void RobotOpenGLWidget::setGlbNodeTransforms(const QVector<QMatrix4x4> &nodeTransforms)
-{
+void RobotOpenGLWidget::setGlbNodeTransforms(const QVector<QMatrix4x4> &nodeTransforms) {
     m_glbNodeTransforms = nodeTransforms;
     if (m_selectedNodeIndex >= 0 && m_selectedNodeIndex < m_glbNodeTransforms.size()) {
         m_targetGizmo.setAxesFromTransform(m_glbNodeTransforms[m_selectedNodeIndex]);
@@ -204,16 +187,14 @@ void RobotOpenGLWidget::setGlbNodeTransforms(const QVector<QMatrix4x4> &nodeTran
     update();
 }
 
-void RobotOpenGLWidget::setIkTargetPosition(const QVector3D &position)
-{
+void RobotOpenGLWidget::setIkTargetPosition(const QVector3D &position) {
     m_gizmoFollowsSelectedNode = false;
     m_targetGizmo.setPosition(position);
     update();
 }
 
-void RobotOpenGLWidget::clearGlbResources()
-{
-    for (const std::unique_ptr<GpuMesh> &mesh : m_glbMeshes) {
+void RobotOpenGLWidget::clearGlbResources() {
+    for (const std::unique_ptr<GpuMesh> &mesh: m_glbMeshes) {
         mesh->vertices.destroy();
         mesh->indices.destroy();
         mesh->vao.destroy();
@@ -221,19 +202,23 @@ void RobotOpenGLWidget::clearGlbResources()
     m_glbMeshes.clear();
 }
 
-void RobotOpenGLWidget::uploadGlbModel()
-{
+void RobotOpenGLWidget::uploadGlbModel() {
     clearGlbResources();
     if (!m_glbModel)
         return;
-    for (const GlbMesh &source : m_glbModel->meshes()) {
+    for (const GlbMesh &source: m_glbModel->meshes()) {
         auto mesh = std::make_unique<GpuMesh>();
-        mesh->vao.create(); mesh->vao.bind();
-        mesh->vertices.create(); mesh->vertices.bind();
+        mesh->vao.create();
+        mesh->vao.bind();
+        mesh->vertices.create();
+        mesh->vertices.bind();
         mesh->vertices.allocate(source.vertices.constData(), source.vertices.size() * int(sizeof(float)));
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr); glEnableVertexAttribArray(0);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), reinterpret_cast<void *>(3 * sizeof(float))); glEnableVertexAttribArray(1);
-        mesh->indices.create(); mesh->indices.bind();
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), reinterpret_cast<void *>(3 * sizeof(float)));
+        glEnableVertexAttribArray(1);
+        mesh->indices.create();
+        mesh->indices.bind();
         mesh->indices.allocate(source.indices.constData(), source.indices.size() * int(sizeof(quint32)));
         mesh->indexCount = source.indices.size();
         // EBO 绑定是 VAO 状态的一部分。此处若 release()，会在仍绑定该 VAO 时
@@ -244,28 +229,29 @@ void RobotOpenGLWidget::uploadGlbModel()
     }
 }
 
-void RobotOpenGLWidget::mousePressEvent(QMouseEvent *event)
-{
+void RobotOpenGLWidget::mousePressEvent(QMouseEvent *event) {
     m_lastMousePosition = event->pos();
     if (event->button() == Qt::LeftButton) {
         m_leftPressPosition = event->pos();
         m_leftDragActive = false;
-        m_draggingIkTarget = m_targetGizmo.beginDrag(event->pos(), size(), m_projection, m_camera.viewMatrix(), m_camera.position());
+        m_draggingIkTarget = m_targetGizmo.beginDrag(event->pos(), size(), m_projection, m_camera.viewMatrix(),
+                                                     m_camera.position());
     }
     event->accept();
 }
 
-void RobotOpenGLWidget::mouseMoveEvent(QMouseEvent *event)
-{
+void RobotOpenGLWidget::mouseMoveEvent(QMouseEvent *event) {
     const QPoint delta = event->pos() - m_lastMousePosition;
     m_lastMousePosition = event->pos();
 
     if (event->buttons().testFlag(Qt::LeftButton)) {
         if (m_draggingIkTarget) {
             if (m_targetGizmo.drag(event->pos(), size(), m_projection, m_camera.viewMatrix())) {
-                if (m_gizmoFollowsSelectedNode && m_selectedNodeIndex >= 0 && m_selectedNodeIndex < m_glbNodeTransforms.size()) {
+                if (m_gizmoFollowsSelectedNode && m_selectedNodeIndex >= 0 && m_selectedNodeIndex < m_glbNodeTransforms.
+                    size()) {
                     bool invertible = false;
-                    const QMatrix4x4 inverseNodeTransform = m_glbNodeTransforms[m_selectedNodeIndex].inverted(&invertible);
+                    const QMatrix4x4 inverseNodeTransform = m_glbNodeTransforms[m_selectedNodeIndex].inverted(
+                        &invertible);
                     if (invertible)
                         m_gizmoLocalOffset = inverseNodeTransform.map(m_targetGizmo.position());
                 }
@@ -285,8 +271,7 @@ void RobotOpenGLWidget::mouseMoveEvent(QMouseEvent *event)
     event->accept();
 }
 
-void RobotOpenGLWidget::mouseReleaseEvent(QMouseEvent *event)
-{
+void RobotOpenGLWidget::mouseReleaseEvent(QMouseEvent *event) {
     if (event->button() == Qt::LeftButton && m_draggingIkTarget) {
         m_targetGizmo.endDrag();
         m_draggingIkTarget = false;
@@ -294,7 +279,8 @@ void RobotOpenGLWidget::mouseReleaseEvent(QMouseEvent *event)
         return;
     }
     if (event->button() == Qt::LeftButton && !m_leftDragActive && m_glbModel) {
-        const int pickedNode = ScenePicker::pickNode(event->pos(), size(), m_projection, m_camera.viewMatrix(), *m_glbModel, m_glbNodeTransforms);
+        const int pickedNode = ScenePicker::pickNode(event->pos(), size(), m_projection, m_camera.viewMatrix(),
+                                                     *m_glbModel, m_glbNodeTransforms);
         m_selectedNodeIndex = pickedNode;
         if (pickedNode >= 0) {
             m_targetGizmo.setPosition(m_glbNodeTransforms[pickedNode].map({0.0f, 0.0f, 0.0f}));
@@ -308,16 +294,14 @@ void RobotOpenGLWidget::mouseReleaseEvent(QMouseEvent *event)
     event->accept();
 }
 
-void RobotOpenGLWidget::wheelEvent(QWheelEvent *event)
-{
+void RobotOpenGLWidget::wheelEvent(QWheelEvent *event) {
     const float wheelSteps = float(event->angleDelta().y()) / 120.0f;
     m_camera.zoom(wheelSteps);
     update();
     event->accept();
 }
 
-void RobotOpenGLWidget::createSceneGeometry()
-{
+void RobotOpenGLWidget::createSceneGeometry() {
     std::vector<Vertex> lines;
     const auto addLine = [&lines](const QVector3D &a, const QVector3D &b, const QVector3D &color) {
         lines.push_back({a.x(), a.y(), a.z(), color.x(), color.y(), color.z()});
@@ -327,8 +311,9 @@ void RobotOpenGLWidget::createSceneGeometry()
     constexpr int halfGrid = 10;
     for (int i = -halfGrid; i <= halfGrid; ++i) {
         const float coordinate = float(i);
-        const QVector3D gridColor = i == 0 ? QVector3D(0.42f, 0.44f, 0.47f)
-                                           : QVector3D(0.29f, 0.30f, 0.33f);
+        const QVector3D gridColor = i == 0
+                                        ? QVector3D(0.42f, 0.44f, 0.47f)
+                                        : QVector3D(0.29f, 0.30f, 0.33f);
         addLine({coordinate, 0.0f, -halfGrid}, {coordinate, 0.0f, halfGrid}, gridColor);
         addLine({-halfGrid, 0.0f, coordinate}, {halfGrid, 0.0f, coordinate}, gridColor);
     }
@@ -349,36 +334,9 @@ void RobotOpenGLWidget::createSceneGeometry()
     m_lineVao.release();
     m_lineVertexCount = int(lines.size());
 
-    constexpr std::array<Vertex, 36> cube = {{
-        {-0.5f,-0.5f, 0.5f, 0.95f,0.55f,0.15f}, { 0.5f,-0.5f, 0.5f, 0.95f,0.55f,0.15f}, { 0.5f, 0.5f, 0.5f, 0.95f,0.55f,0.15f},
-        {-0.5f,-0.5f, 0.5f, 0.95f,0.55f,0.15f}, { 0.5f, 0.5f, 0.5f, 0.95f,0.55f,0.15f}, {-0.5f, 0.5f, 0.5f, 0.95f,0.55f,0.15f},
-        { 0.5f,-0.5f,-0.5f, 0.80f,0.36f,0.08f}, {-0.5f,-0.5f,-0.5f, 0.80f,0.36f,0.08f}, {-0.5f, 0.5f,-0.5f, 0.80f,0.36f,0.08f},
-        { 0.5f,-0.5f,-0.5f, 0.80f,0.36f,0.08f}, {-0.5f, 0.5f,-0.5f, 0.80f,0.36f,0.08f}, { 0.5f, 0.5f,-0.5f, 0.80f,0.36f,0.08f},
-        {-0.5f,-0.5f,-0.5f, 0.72f,0.32f,0.08f}, {-0.5f,-0.5f, 0.5f, 0.72f,0.32f,0.08f}, {-0.5f, 0.5f, 0.5f, 0.72f,0.32f,0.08f},
-        {-0.5f,-0.5f,-0.5f, 0.72f,0.32f,0.08f}, {-0.5f, 0.5f, 0.5f, 0.72f,0.32f,0.08f}, {-0.5f, 0.5f,-0.5f, 0.72f,0.32f,0.08f},
-        { 0.5f,-0.5f, 0.5f, 1.00f,0.68f,0.20f}, { 0.5f,-0.5f,-0.5f, 1.00f,0.68f,0.20f}, { 0.5f, 0.5f,-0.5f, 1.00f,0.68f,0.20f},
-        { 0.5f,-0.5f, 0.5f, 1.00f,0.68f,0.20f}, { 0.5f, 0.5f,-0.5f, 1.00f,0.68f,0.20f}, { 0.5f, 0.5f, 0.5f, 1.00f,0.68f,0.20f},
-        {-0.5f, 0.5f, 0.5f, 1.00f,0.70f,0.24f}, { 0.5f, 0.5f, 0.5f, 1.00f,0.70f,0.24f}, { 0.5f, 0.5f,-0.5f, 1.00f,0.70f,0.24f},
-        {-0.5f, 0.5f, 0.5f, 1.00f,0.70f,0.24f}, { 0.5f, 0.5f,-0.5f, 1.00f,0.70f,0.24f}, {-0.5f, 0.5f,-0.5f, 1.00f,0.70f,0.24f},
-        {-0.5f,-0.5f,-0.5f, 0.60f,0.25f,0.05f}, { 0.5f,-0.5f,-0.5f, 0.60f,0.25f,0.05f}, { 0.5f,-0.5f, 0.5f, 0.60f,0.25f,0.05f},
-        {-0.5f,-0.5f,-0.5f, 0.60f,0.25f,0.05f}, { 0.5f,-0.5f, 0.5f, 0.60f,0.25f,0.05f}, {-0.5f,-0.5f, 0.5f, 0.60f,0.25f,0.05f}
-    }};
-    m_cubeVao.create();
-    m_cubeVao.bind();
-    m_cubeBuffer.create();
-    m_cubeBuffer.bind();
-    m_cubeBuffer.allocate(cube.data(), int(cube.size() * sizeof(Vertex)));
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), nullptr);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void *>(3 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-    m_cubeBuffer.release();
-    m_cubeVao.release();
-    m_cubeVertexCount = int(cube.size());
 }
 
-void RobotOpenGLWidget::createGizmoResources()
-{
+void RobotOpenGLWidget::createGizmoResources() {
     m_gizmoVao.create();
     m_gizmoVao.bind();
     m_gizmoBuffer.create();
@@ -392,8 +350,7 @@ void RobotOpenGLWidget::createGizmoResources()
     m_gizmoVao.release();
 }
 
-void RobotOpenGLWidget::drawTargetGizmo()
-{
+void RobotOpenGLWidget::drawTargetGizmo() {
     const QVector3D center = m_targetGizmo.position();
     const float length = m_targetGizmo.axisLength(m_camera.position());
     std::vector<Vertex> vertices;
@@ -401,7 +358,8 @@ void RobotOpenGLWidget::drawTargetGizmo()
         vertices.push_back({start.x(), start.y(), start.z(), color.x(), color.y(), color.z()});
         vertices.push_back({end.x(), end.y(), end.z(), color.x(), color.y(), color.z()});
     };
-    const QVector3D xAxis = m_targetGizmo.axisDirection(0), yAxis = m_targetGizmo.axisDirection(1), zAxis = m_targetGizmo.axisDirection(2);
+    const QVector3D xAxis = m_targetGizmo.axisDirection(0), yAxis = m_targetGizmo.axisDirection(1), zAxis =
+            m_targetGizmo.axisDirection(2);
     addLine(center, center + xAxis * length, {0.95f, 0.15f, 0.15f});
     addLine(center, center + yAxis * length, {0.15f, 0.95f, 0.20f});
     addLine(center, center + zAxis * length, {0.20f, 0.45f, 1.0f});
@@ -430,8 +388,7 @@ void RobotOpenGLWidget::drawTargetGizmo()
     glEnable(GL_DEPTH_TEST);
 }
 
-void RobotOpenGLWidget::drawGeometry(QOpenGLVertexArrayObject &vao, int count, unsigned int primitive)
-{
+void RobotOpenGLWidget::drawGeometry(QOpenGLVertexArrayObject &vao, int count, unsigned int primitive) {
     if (count == 0)
         return;
     vao.bind();
@@ -439,17 +396,7 @@ void RobotOpenGLWidget::drawGeometry(QOpenGLVertexArrayObject &vao, int count, u
     vao.release();
 }
 
-void RobotOpenGLWidget::drawCube(const QMatrix4x4 &model, const QMatrix4x4 &view)
-{
-    Q_UNUSED(view);
-    m_program.setUniformValue("model", model);
-    m_program.setUniformValue("useLighting", false);
-    m_program.setUniformValue("selected", false);
-    drawGeometry(m_cubeVao, m_cubeVertexCount, GL_TRIANGLES);
-}
-
-void RobotOpenGLWidget::resetCamera()
-{
+void RobotOpenGLWidget::resetCamera() {
     m_camera.reset();
     update();
 }

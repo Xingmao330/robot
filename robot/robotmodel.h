@@ -4,7 +4,6 @@
 #include "joint.h"
 #include "glbmodel.h"
 #include "kinematicstate.h"
-#include "link.h"
 
 #include <QVector>
 
@@ -16,7 +15,6 @@ public:
     void setJointAngle(int index, float degrees);
     bool loadGlbFile(const QString &fileName, QString *errorMessage);
     [[nodiscard]] const QVector<Joint> &joints() const;
-    [[nodiscard]] const QVector<Link> &links() const;
     [[nodiscard]] bool hasGlbModel() const;
     [[nodiscard]] const GlbModel &glbModel() const;
     [[nodiscard]] QVector<QMatrix4x4> glbNodeTransforms() const;
@@ -25,7 +23,6 @@ public:
 
 private:
     QVector<Joint> m_joints;
-    QVector<Link> m_links;
     GlbModel m_glbModel;
 };
 
